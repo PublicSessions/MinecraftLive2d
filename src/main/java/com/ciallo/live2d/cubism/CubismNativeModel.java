@@ -601,7 +601,12 @@ public class CubismNativeModel implements Closeable {
     @Override
     public void close() {
         if (model != null && Pointer.nativeValue(model) != 0) {
-            core.csmDisposeModel(model);
+            try {
+                core.csmDisposeModel(model);
+            } catch (Throwable t) {
+                // This Cubism Core build does not export csmDisposeModel; the model
+                // memory lives in our JNA buffers which are freed below anyway.
+            }
         }
         if (mocMemory != null) mocMemory.close();
         if (modelMemory != null) modelMemory.close();

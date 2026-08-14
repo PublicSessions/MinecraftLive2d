@@ -589,8 +589,8 @@ public void render(DrawContext context, float tickDelta) {
         if (model != null) {
             try {
                 model.close();
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (Throwable t) {
+                t.printStackTrace();
             }
         }
         model = null;
