@@ -67,26 +67,26 @@ public class Live2dSettingsScreen extends Screen {
 	private void rebuild() {
 		clearChildren();
 		labels.clear();
-		int x = LEFT;
-		int contentW = this.width - LEFT - LEFT;
+		int controlX = Math.max(150, this.width / 2);
+		int controlW = this.width - controlX - LEFT;
 		int y = TOP;
 
-		y = addToggle(x, y, contentW, "Enabled", config.enabled, hud::setEnabled);
-		y = addModelButton(x, y, contentW, "Model");
-		y = addSlider(x, y, contentW, "Size", (config.size - 40) / 760.0, v -> config.size = 40 + (int) Math.round(v * 760));
-		y = addSlider(x, y, contentW, "PosX", (config.posX + 300) / 2300.0, v -> config.posX = (int) Math.round(v * 2300 - 300));
-		y = addSlider(x, y, contentW, "PosY", (config.posY + 100) / 1100.0, v -> config.posY = (int) Math.round(v * 1100 - 100));
-		y = addSlider(x, y, contentW, "Sway", config.swayStrength / 3.0, v -> config.swayStrength = (float) (v * 3.0));
-		y = addSlider(x, y, contentW, "Smoothing", (config.smoothing - 0.02f) / 0.58, v -> config.smoothing = (float) (0.02 + v * 0.58));
-		y = addSlider(x, y, contentW, "WheelStep", (config.wheelResizeStep - 1) / 19.0, v -> config.wheelResizeStep = 1 + (int) Math.round(v * 19));
-		y = addSlider(x, y, contentW, "SoundThreshold", config.soundBlinkThreshold, v -> config.soundBlinkThreshold = v.floatValue());
-		y = addToggle(x, y, contentW, "FollowPitch", config.followPitch, hud::setFollowPitch);
-		y = addToggle(x, y, contentW, "Blink", config.blinkEnabled, hud::setBlinkEnabled);
-		y = addToggle(x, y, contentW, "Masks", config.masksEnabled, hud::setMasksEnabled);
-		y = addToggle(x, y, contentW, "ChatDrag", config.chatDragEnabled, hud::setChatDragEnabled);
-		y = addToggle(x, y, contentW, "SoundBlink", config.soundBlinkEnabled, hud::setSoundBlinkEnabled);
+		y = addToggle(controlX, y, controlW, "Enabled", config.enabled, hud::setEnabled);
+		y = addModelButton(controlX, y, controlW, "Model");
+		y = addSlider(controlX, y, controlW, "Size", (config.size - 40) / 760.0, v -> config.size = 40 + (int) Math.round(v * 760));
+		y = addSlider(controlX, y, controlW, "PosX", (config.posX + 300) / 2300.0, v -> config.posX = (int) Math.round(v * 2300 - 300));
+		y = addSlider(controlX, y, controlW, "PosY", (config.posY + 100) / 1100.0, v -> config.posY = (int) Math.round(v * 1100 - 100));
+		y = addSlider(controlX, y, controlW, "Sway", config.swayStrength / 3.0, v -> config.swayStrength = (float) (v * 3.0));
+		y = addSlider(controlX, y, controlW, "Smoothing", (config.smoothing - 0.02f) / 0.58, v -> config.smoothing = (float) (0.02 + v * 0.58));
+		y = addSlider(controlX, y, controlW, "WheelStep", (config.wheelResizeStep - 1) / 19.0, v -> config.wheelResizeStep = 1 + (int) Math.round(v * 19));
+		y = addSlider(controlX, y, controlW, "SoundThreshold", config.soundBlinkThreshold, v -> config.soundBlinkThreshold = v.floatValue());
+		y = addToggle(controlX, y, controlW, "FollowPitch", config.followPitch, hud::setFollowPitch);
+		y = addToggle(controlX, y, controlW, "Blink", config.blinkEnabled, hud::setBlinkEnabled);
+		y = addToggle(controlX, y, controlW, "Masks", config.masksEnabled, hud::setMasksEnabled);
+		y = addToggle(controlX, y, controlW, "ChatDrag", config.chatDragEnabled, hud::setChatDragEnabled);
+		y = addToggle(controlX, y, controlW, "SoundBlink", config.soundBlinkEnabled, hud::setSoundBlinkEnabled);
 
-		y = addEventRows(x, y, contentW);
+		y = addEventRows(controlX, y, controlW);
 		contentBottom = y;
 
 		clampScroll();
@@ -99,6 +99,7 @@ public class Live2dSettingsScreen extends Screen {
 		labels.add(new Label(label, y));
 		if (inView(y)) {
 			addDrawableChild(CyclingButtonWidget.onOffBuilder(Text.literal("On"), Text.literal("Off"), value)
+					.omitKeyText()
 					.build(x, y, w, ROW_H, Text.literal(label), (btn, val) -> onChanged.accept(val)));
 		}
 		return y + ROW_H + ROW_GAP;
@@ -113,6 +114,7 @@ public class Live2dSettingsScreen extends Screen {
 				}).dimensions(x, y, w, ROW_H).build());
 			} else {
 				addDrawableChild(CyclingButtonWidget.builder(Text::literal, (Supplier<String>) () -> config.model)
+						.omitKeyText()
 						.values(models)
 						.build(x, y, w, ROW_H, Text.literal(label), (btn, val) -> hud.setModel(val)));
 			}
@@ -126,7 +128,7 @@ public class Live2dSettingsScreen extends Screen {
 			addDrawableChild(new SliderWidget(x, y, w, ROW_H, Text.literal(label), value) {
 				@Override
 				protected void updateMessage() {
-					setMessage(Text.literal(label + ": " + fmt(this.value)));
+					setMessage(Text.literal(fmt(this.value)));
 				}
 
 				@Override
@@ -139,7 +141,7 @@ public class Live2dSettingsScreen extends Screen {
 	}
 
 	private int addEventRows(int x, int y, int w) {
-		labels.add(new Label("Events (add as event:type:target[:value[:duration[:fade]]])", y));
+		labels.add(new Label("Events (add: event:type:target[:v[:dur[:fade]]])", y));
 		y += ROW_H + ROW_GAP;
 		for (Map.Entry<String, Live2dConfig.EventAction> entry : config.events.entrySet()) {
 			String ev = entry.getKey();

@@ -87,7 +87,9 @@ public class CubismNativeModel implements Closeable {
             if (in != null) {
                 Path dllPath = gameDir.resolve("live2d/native/live2dcubismcore.dll");
                 Files.createDirectories(dllPath.getParent());
-                Files.copy(in, dllPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                if (!Files.exists(dllPath)) {
+                    Files.copy(in, dllPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
                 return CubismCore.load(dllPath.toAbsolutePath().toString());
             }
         }
