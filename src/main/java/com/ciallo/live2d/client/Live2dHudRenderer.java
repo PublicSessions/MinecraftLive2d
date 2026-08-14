@@ -77,6 +77,9 @@ public class Live2dHudRenderer {
     private boolean chatDragActive;
     private double lastDragX;
     private double lastDragY;
+    private boolean modelSelected;
+    private boolean wasLeftDown;
+    private boolean soundListenerRegistered;
 
     private float soundActivity;
     private boolean volumeHigh;
@@ -87,11 +90,6 @@ public class Live2dHudRenderer {
         this.configPath = configPath;
         this.modelLoader = new Live2dModelLoader(mc);
         this.eventSystem = new Live2dEventSystem(this, mc, config);
-        try {
-            mc.getSoundManager().registerListener(this::onSoundPlayed);
-        } catch (Throwable t) {
-            System.err.println("[Live2D] failed to register sound listener: " + t);
-        }
     }
 
     public String getLoadError() {
@@ -316,6 +314,14 @@ public class Live2dHudRenderer {
     }
 
     public void handleTick() {
+        if (!soundListenerRegistered && mc.getSoundManager() != null) {
+            try {
+                mc.getSoundManager().registerListener(this::onSoundPlayed);
+                soundListenerRegistered = true;
+            } catch (Throwable t) {
+                System.err.println("[Live2D] failed to register sound listener: " + t);
+            }
+        }
         if (editMode) {
             net.minecraft.client.util.Window window = mc.getWindow();
             boolean moved = false;
@@ -417,7 +423,19 @@ public void render(DrawContext context, float tickDelta) {
 	if (editMode) {
 		renderEditFrame(context, w, h);
 	}
+
+	if (modelSelected) {
+		renderSelectionFrame(context, ex, ey, w, h);
+	}
 }
+
+    private void renderSelectionFrame(DrawContext context, int x, int y, int w, int h) {
+        int color = 0xCC7DF9FF;
+        context.fill(x - 2, y - 2, x + w + 2, y - 1, color);
+        context.fill(x - 2, y + h + 1, x + w + 2, y + h + 2, color);
+        context.fill(x - 2, y - 2, x - 1, y + h + 2, color);
+        context.fill(x + w + 1, y - 2, x + w + 2, y + h + 2, color);
+    }
 
     private void handleChatMouseInteraction() {
         if (!config.chatDragEnabled) {
@@ -426,6 +444,8 @@ public void render(DrawContext context, float tickDelta) {
         boolean chatOpen = mc.currentScreen instanceof ChatScreen;
         if (!chatOpen) {
             chatDragActive = false;
+            wasLeftDown = false;
+            modelSelected = false;
             return;
         }
         ensureScrollHooked();
@@ -433,7 +453,12 @@ public void render(DrawContext context, float tickDelta) {
         boolean left = GLFW.glfwGetMouseButton(window.getHandle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
         double mx = mc.mouse.getScaledX(window);
         double my = mc.mouse.getScaledY(window);
-        if (left) {
+        boolean justPressed = left && !wasLeftDown;
+        if (justPressed) {
+            int[] b = currentElementBounds();
+            modelSelected = mx >= b[0] && mx <= b[2] && my >= b[1] && my <= b[3];
+        }
+        if (left && modelSelected) {
             if (chatDragActive) {
                 int dx = (int) Math.round(mx - lastDragX);
                 int dy = (int) Math.round(my - lastDragY);
@@ -449,15 +474,27 @@ public void render(DrawContext context, float tickDelta) {
         } else {
             chatDragActive = false;
         }
+        wasLeftDown = left;
         if (pendingScroll != 0.0) {
-            int step = Math.max(1, config.wheelResizeStep);
-            int newSize = MathHelper.clamp(config.size + (int) Math.round(pendingScroll * step), 40, 800);
-            pendingScroll = 0.0;
-            if (newSize != config.size) {
-                config.size = newSize;
-                saveConfig();
+            if (modelSelected) {
+                int step = Math.max(1, config.wheelResizeStep);
+                int newSize = MathHelper.clamp(config.size + (int) Math.round(pendingScroll * step), 40, 800);
+                if (newSize != config.size) {
+                    config.size = newSize;
+                    saveConfig();
+                }
             }
+            pendingScroll = 0.0;
         }
+    }
+
+    private int[] currentElementBounds() {
+        int h = Math.max(40, config.size);
+        float aspect = model != null ? Math.max(0.05f, model.getBboxAspect()) : 0.99666667f;
+        int w = Math.max(1, Math.round(h * aspect));
+        int ex = Math.round(config.posX + springX * 0.55f);
+        int ey = Math.round(config.posY + springY * 0.3f + idleBob());
+        return new int[]{ex, ey, ex + w, ey + h};
     }
 
     private void ensureScrollHooked() {

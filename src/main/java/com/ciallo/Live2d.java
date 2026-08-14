@@ -13,6 +13,6 @@ public class Live2d implements ModInitializer {
 	@Override
 	public void onInitialize() {
 
-		LOGGER.info("Hello Fabric world!");
+		LOGGER.info("Live2d by P1ay2r");
 	}
 }

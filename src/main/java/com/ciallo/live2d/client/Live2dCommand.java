@@ -7,6 +7,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 
 import java.util.List;
@@ -30,6 +31,10 @@ public final class Live2dCommand {
 						}))
 						.then(ClientCommandManager.literal("status").executes(ctx -> {
 							send(ctx.getSource(), hud.getStatus());
+							return 1;
+						}))
+						.then(ClientCommandManager.literal("gui").executes(ctx -> {
+							MinecraftClient.getInstance().setScreen(new Live2dSettingsScreen(hud));
 							return 1;
 						}))
 						.then(ClientCommandManager.literal("models").executes(ctx -> {
