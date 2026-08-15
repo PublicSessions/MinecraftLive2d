@@ -174,7 +174,14 @@ public final class Live2dCommand {
 							send(ctx.getSource(), sb.toString());
 							return 1;
 						}))
-.then(eventCommand())
+.then(ClientCommandManager.literal("fire")
+						.then(ClientCommandManager.argument("event", StringArgumentType.word()).executes(ctx -> {
+							String ev = StringArgumentType.getString(ctx, "event");
+							hud.getEventSystem().fire(ev);
+							send(ctx.getSource(), "Fired event '" + ev + "'");
+							return 1;
+						})))
+						.then(eventCommand())
 						.executes(ctx -> {
 							send(ctx.getSource(), hud.getStatus());
 							return 1;
@@ -186,7 +193,7 @@ public final class Live2dCommand {
 				.then(ClientCommandManager.argument("name", StringArgumentType.word())
 						.executes(ctx -> {
 							send(ctx.getSource(), "Usage: /live2d event <name> <motion|expression|param> <target> [value] [duration] [fade]");
-							send(ctx.getSource(), "Events: chat_opened chat_closed screen_open screen_close join_world hurt death respawn attack jump land swim_start swim_end underwater surface sneak stand sprint_start sprint_end rain clear thunder night day low_health high_health volume_high volume_low idle");
+							send(ctx.getSource(), "Events: chat_opened chat_closed screen_open screen_close join_world hurt death respawn attack jump land swim_start swim_end underwater surface sneak stand sprint_start sprint_end rain clear thunder night day low_health high_health volume_high volume_low totem_self totem_other key_trigger idle");
 							return 1;
 						})
 						.then(ClientCommandManager.literal("off").executes(ctx -> {

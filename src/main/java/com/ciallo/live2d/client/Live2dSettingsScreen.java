@@ -50,10 +50,13 @@ public class Live2dSettingsScreen extends Screen {
 		context.drawTextWithShadow(textRenderer, this.title, LEFT, 8, 0xFFFFFFFF);
 		context.enableScissor(0, TOP, this.width, this.height);
 		for (Label label : labels) {
-			context.drawTextWithShadow(textRenderer, label.text(), LEFT, label.y() + 3, 0xFFE0E0E0);
+			context.drawTextWithShadow(textRenderer, label.text(), LEFT, (int) (label.y() + scrollY) + 3, 0xFFE0E0E0);
 		}
 		super.render(context, mouseX, mouseY, delta);
 		context.disableScissor();
+		if (contentBottom - (this.height - FOOTER) > 0) {
+			context.drawTextWithShadow(textRenderer, "Scroll: mouse wheel", LEFT, this.height - 28, 0xFF777777);
+		}
 	}
 
 	@Override
@@ -73,6 +76,7 @@ public class Live2dSettingsScreen extends Screen {
 
 		y = addToggle(controlX, y, controlW, "Enabled", config.enabled, hud::setEnabled);
 		y = addModelButton(controlX, y, controlW, "Model");
+		y = addExpressionButton(controlX, y, controlW, "Expression");
 		y = addSlider(controlX, y, controlW, "Size", (config.size - 40) / 760.0, v -> config.size = 40 + (int) Math.round(v * 760));
 		y = addSlider(controlX, y, controlW, "PosX", (config.posX + 300) / 2300.0, v -> config.posX = (int) Math.round(v * 2300 - 300));
 		y = addSlider(controlX, y, controlW, "PosY", (config.posY + 100) / 1100.0, v -> config.posY = (int) Math.round(v * 1100 - 100));
@@ -100,7 +104,7 @@ public class Live2dSettingsScreen extends Screen {
 		if (inView(y)) {
 			addDrawableChild(CyclingButtonWidget.onOffBuilder(Text.literal("On"), Text.literal("Off"), value)
 					.omitKeyText()
-					.build(x, y, w, ROW_H, Text.literal(label), (btn, val) -> onChanged.accept(val)));
+					.build(x, (int) (y + scrollY), w, ROW_H, Text.literal(label), (btn, val) -> onChanged.accept(val)));
 		}
 		return y + ROW_H + ROW_GAP;
 	}
@@ -111,12 +115,34 @@ public class Live2dSettingsScreen extends Screen {
 			List<String> models = hud.getAvailableModels();
 			if (models.isEmpty() || !models.contains(config.model)) {
 				addDrawableChild(ButtonWidget.builder(Text.literal("No models"), b -> {
-				}).dimensions(x, y, w, ROW_H).build());
+				}).dimensions(x, (int) (y + scrollY), w, ROW_H).build());
 			} else {
 				addDrawableChild(CyclingButtonWidget.builder(Text::literal, (Supplier<String>) () -> config.model)
 						.omitKeyText()
 						.values(models)
-						.build(x, y, w, ROW_H, Text.literal(label), (btn, val) -> hud.setModel(val)));
+						.build(x, (int) (y + scrollY), w, ROW_H, Text.literal(label), (btn, val) -> hud.setModel(val)));
+			}
+		}
+		return y + ROW_H + ROW_GAP;
+	}
+
+	private int addExpressionButton(int x, int y, int w, String label) {
+		labels.add(new Label(label, y));
+		if (inView(y)) {
+			List<String> expressions = hud.getAvailableExpressions();
+			if (expressions.isEmpty()) {
+				addDrawableChild(ButtonWidget.builder(Text.literal("No expressions"), b -> {
+				}).dimensions(x, (int) (y + scrollY), w, ROW_H).build());
+			} else {
+				List<String> options = new ArrayList<>();
+				options.add("normal");
+				options.addAll(expressions);
+				addDrawableChild(CyclingButtonWidget.builder(Text::literal,
+						(Supplier<String>) () -> hud.getActiveExpression() == null ? "normal" : hud.getActiveExpression())
+						.omitKeyText()
+						.values(options)
+						.build(x, (int) (y + scrollY), w, ROW_H, Text.literal(label),
+								(btn, val) -> hud.setActiveExpression(val.equals("normal") ? null : val)));
 			}
 		}
 		return y + ROW_H + ROW_GAP;
@@ -125,7 +151,7 @@ public class Live2dSettingsScreen extends Screen {
 	private int addSlider(int x, int y, int w, String label, double value, Consumer<Double> onChanged) {
 		labels.add(new Label(label, y));
 		if (inView(y)) {
-			addDrawableChild(new SliderWidget(x, y, w, ROW_H, Text.literal(label), value) {
+			addDrawableChild(new SliderWidget(x, (int) (y + scrollY), w, ROW_H, Text.literal(label), value) {
 				@Override
 				protected void updateMessage() {
 					setMessage(Text.literal(fmt(this.value)));
@@ -154,17 +180,17 @@ public class Live2dSettingsScreen extends Screen {
 				addDrawableChild(ButtonWidget.builder(Text.literal("Remove"), b -> {
 					hud.removeEventAction(ev);
 					rebuild();
-				}).dimensions(x + w - 62, y, 62, ROW_H).build());
+				}).dimensions(x + w - 62, (int) (y + scrollY), 62, ROW_H).build());
 			}
 			y += ROW_H + ROW_GAP;
 		}
 		labels.add(new Label("Add event:", y));
 		if (inView(y)) {
-			eventField = new TextFieldWidget(textRenderer, x, y, w - 62, ROW_H, Text.literal("event:type:target"));
+			eventField = new TextFieldWidget(textRenderer, x, (int) (y + scrollY), w - 62, ROW_H, Text.literal("event:type:target"));
 			eventField.setMaxLength(128);
 			addDrawableChild(eventField);
 			addDrawableChild(ButtonWidget.builder(Text.literal("Add"), b -> addEvent())
-					.dimensions(x + w - 56, y, 56, ROW_H).build());
+					.dimensions(x + w - 56, (int) (y + scrollY), 56, ROW_H).build());
 		}
 		return y + ROW_H + ROW_GAP;
 	}
@@ -213,7 +239,8 @@ public class Live2dSettingsScreen extends Screen {
 	}
 
 	private boolean inView(double y) {
-		return y + ROW_H > TOP && y < this.height - 8;
+		double screenY = y + scrollY;
+		return screenY + ROW_H > TOP && screenY < this.height - FOOTER;
 	}
 
 	private static String fmt(double v) {

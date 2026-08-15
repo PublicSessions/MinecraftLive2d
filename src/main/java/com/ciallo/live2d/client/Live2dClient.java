@@ -22,8 +22,16 @@ public class Live2dClient implements ClientModInitializer {
     public static KeyBinding KEY_EXPRESSION;
     public static KeyBinding KEY_EDIT;
     public static KeyBinding KEY_GUI;
+    public static KeyBinding KEY_TRIGGER;
 
-    private Live2dHudRenderer hud;
+    public static Live2dHudRenderer hud;
+
+    public static void onTotemUsed(boolean self) {
+        if (hud == null) {
+            return;
+        }
+        hud.handleTotemUse(self);
+    }
 
     @Override
     public void onInitializeClient() {
@@ -37,6 +45,7 @@ public class Live2dClient implements ClientModInitializer {
         KEY_EXPRESSION = registerKey("key.live2d.expression", GLFW.GLFW_KEY_F11);
         KEY_EDIT = registerKey("key.live2d.edit", GLFW.GLFW_KEY_F12);
         KEY_GUI = registerKey("key.live2d.gui", GLFW.GLFW_KEY_F8);
+        KEY_TRIGGER = registerKey("key.live2d.trigger", GLFW.GLFW_KEY_F7);
 
         HudRenderCallback.EVENT.register((context, tickCounter) -> {
             if (hud == null || !hud.isEnabled()) return;
@@ -60,6 +69,9 @@ public class Live2dClient implements ClientModInitializer {
             }
             if (KEY_GUI.wasPressed() && !(client.currentScreen instanceof Live2dSettingsScreen)) {
                 client.setScreen(new Live2dSettingsScreen(hud));
+            }
+            if (KEY_TRIGGER.wasPressed()) {
+                hud.getEventSystem().fire("key_trigger");
             }
             hud.handleTick();
         });

@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.sound.SoundInstance;
 import net.minecraft.client.sound.WeightedSoundSet;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import org.lwjgl.glfw.GLFW;
@@ -58,6 +59,7 @@ public class Live2dHudRenderer {
     private long blinkStartedAt = -1L;
 
     private String activeExpression;
+    private String lastAppliedExpression;
     private float activeWeight;
     private float hurtWeight;
     private float deathWeight;
@@ -83,6 +85,7 @@ public class Live2dHudRenderer {
 
     private float soundActivity;
     private boolean volumeHigh;
+    private long lastTotemFire;
 
     public Live2dHudRenderer(MinecraftClient mc, Live2dConfig config, Path configPath) {
         this.mc = mc;
@@ -118,6 +121,10 @@ public class Live2dHudRenderer {
 
     public Map<String, Live2dConfig.EventAction> getEvents() {
         return config.events;
+    }
+
+    public Live2dEventSystem getEventSystem() {
+        return eventSystem;
     }
 
     public void toggleEnabled() {
@@ -237,7 +244,21 @@ public class Live2dHudRenderer {
     }
 
     public void cycleExpression() {
-
+        List<String> expressions = getAvailableExpressions();
+        if (expressions.isEmpty()) {
+            return;
+        }
+        List<String> options = new ArrayList<>();
+        options.add("normal");
+        options.addAll(expressions);
+        String current = activeExpression == null ? "normal" : activeExpression;
+        int idx = options.indexOf(current);
+        if (idx < 0) {
+            idx = 0;
+        }
+        String next = options.get((idx + 1) % options.size());
+        setActiveExpression(next);
+        System.out.println("[Live2D] expression cycled -> " + (activeExpression == null ? "normal" : activeExpression));
     }
 
     public void toggleEditMode() {
@@ -271,16 +292,19 @@ public class Live2dHudRenderer {
         action.duration = duration;
         action.fade = fade;
         config.events.put(event, action);
-        saveConfig();
+        saveConfigNow();
+        System.out.println("[Live2D] event set: " + event + " -> " + action.type + " " + action.target);
     }
 
     public void removeEventAction(String event) {
         config.events.remove(event);
-        saveConfig();
+        saveConfigNow();
+        System.out.println("[Live2D] event removed: " + event);
     }
 
     public void triggerAction(Live2dConfig.EventAction action) {
         if (model == null || action == null || action.target == null || action.target.isEmpty()) {
+            System.out.println("[Live2D] triggerAction skipped (model=" + (model != null) + " action=" + action + ")");
             return;
         }
         String type = action.type == null ? "expression" : action.type;
@@ -288,10 +312,13 @@ public class Live2dHudRenderer {
             case "motion" -> {
                 if (model.hasMotion(action.target)) {
                     model.playMotion(action.target);
+                } else {
+                    System.out.println("[Live2D] triggerAction: model '" + loadedModel + "' has no motion '" + action.target + "'");
                 }
             }
             case "expression" -> {
                 if (!model.hasExpression(action.target)) {
+                    System.out.println("[Live2D] triggerAction: model '" + loadedModel + "' has no expression '" + action.target + "'");
                     break;
                 }
                 if (action.duration > 0f) {
@@ -302,6 +329,7 @@ public class Live2dHudRenderer {
             }
             case "param" -> {
                 if (!model.hasParameter(action.target)) {
+                    System.out.println("[Live2D] triggerAction: model '" + loadedModel + "' has no parameter '" + action.target + "'");
                     break;
                 }
                 if (action.duration > 0f) {
@@ -516,6 +544,27 @@ public void render(DrawContext context, float tickDelta) {
     private void onSoundPlayed(SoundInstance instance, WeightedSoundSet set, float volume) {
         float v = Math.min(1.0f, Math.max(0.0f, volume)) * Math.min(1.0f, Math.max(0.2f, instance.getPitch()));
         soundActivity = Math.min(1.2f, soundActivity + v);
+
+        if (instance.getId().equals(SoundEvents.ITEM_TOTEM_USE.id())) {
+            boolean self = true;
+            if (mc.player != null) {
+                double dx = instance.getX() - mc.player.getX();
+                double dy = instance.getY() - mc.player.getY();
+                double dz = instance.getZ() - mc.player.getZ();
+                self = (dx * dx + dy * dy + dz * dz) < 4.0;
+            }
+            System.out.println("[Live2D] totem sound detected: self=" + self);
+            handleTotemUse(self);
+        }
+    }
+
+    public void handleTotemUse(boolean self) {
+        long now = System.currentTimeMillis();
+        if (now - lastTotemFire < 400L) {
+            return;
+        }
+        lastTotemFire = now;
+        eventSystem.fire(self ? "totem_self" : "totem_other");
     }
 
     private void applySoundBlink() {
@@ -576,6 +625,7 @@ public void render(DrawContext context, float tickDelta) {
 
         firstFrame = true;
         activeExpression = null;
+        lastAppliedExpression = null;
         activeWeight = 0.0f;
         hurtWeight = 0.0f;
         deathWeight = 0.0f;
@@ -691,12 +741,22 @@ public void render(DrawContext context, float tickDelta) {
     }
 
     private void applyExpressions() {
-        if (model == null || activeExpression == null) {
+        if (model == null) {
             return;
         }
-        if (model.hasExpression(activeExpression)) {
-            model.applyExpression(activeExpression, 1.0f);
+        boolean enabled = config.expressionsEnabled && activeExpression != null;
+        if (!enabled || !model.hasExpression(activeExpression)) {
+            if (lastAppliedExpression != null) {
+                model.resetParametersToDefault();
+                lastAppliedExpression = null;
+            }
+            return;
         }
+        if (!activeExpression.equals(lastAppliedExpression)) {
+            model.resetParametersToDefault();
+            lastAppliedExpression = activeExpression;
+        }
+        model.applyExpression(activeExpression, 1.0f);
     }
 
     private float lerp(float from, float to, float factor) {
@@ -730,6 +790,11 @@ public void render(DrawContext context, float tickDelta) {
             return;
         }
         lastConfigSave = now;
+        config.save(configPath);
+    }
+
+    private void saveConfigNow() {
+        lastConfigSave = System.currentTimeMillis();
         config.save(configPath);
     }
 
